@@ -26,6 +26,12 @@
                 padding-top: 56px;
             }
         }
+        textarea {
+            height: 1000px;
+            width: 800px;
+            resize: both;
+            overflow: auto;
+        }
     </style>
 </head>
 
@@ -69,7 +75,11 @@
                     type="text" name="style_wav">
                 {%endif%}
 
-                <input id="text" placeholder="Type here..." size=45 type="text" name="text">
+                <textarea id="text" placeholder="Type here..." type="text" name="text"></textarea>
+
+                <ul class="list-unstyled">
+                </ul>
+                
                 <button id="speak-button" name="speak">Speak</button><br /><br />
 
                 {%if use_multi_speaker%}
@@ -96,6 +106,7 @@
                     Details</button><br /><br />
                 {%endif%}
                 <audio id="audio" controls autoplay hidden></audio>
+                <audio id="audio2" controls autoplay hidden></audio>
                 <p id="message"></p>
             </div>
         </div>
@@ -121,7 +132,10 @@
                 q('#message').textContent = 'Synthesizing...'
                 q('#speak-button').disabled = true
                 q('#audio').hidden = true
-                synthesize(text, speaker_id, style_wav, language_id)
+                q('#audio').src = ""
+                q('#audio2').hidden = true
+                q('#audio2').src = ""
+                synthesize2(text, speaker_id, style_wav, language_id)
             }
             e.preventDefault()
             return false
@@ -132,7 +146,13 @@
                 do_tts(e)
             }
         })
-        function synthesize(text, speaker_id = "", style_wav = "", language_id = "") {
+        q('#audio').addEventListener('ended', () => {
+            if (! q('#audio2').hidden) {
+                q('#audio2').currentTime = 0;  // rewind to start
+                q('#audio2').play();           // play again
+            }
+        });
+        function synthesize(text, speaker_id = "", style_wav = "", language_id = "", audio = "#audio") {
             fetch(`/api/tts?text=${encodeURIComponent(text)}&speaker_id=${encodeURIComponent(speaker_id)}&style_wav=${encodeURIComponent(style_wav)}&language_id=${encodeURIComponent(language_id)}`, { cache: 'no-cache' })
                 .then(function (res) {
                     if (!res.ok) throw Error(res.statusText)
@@ -140,12 +160,22 @@
                 }).then(function (blob) {
                     q('#message').textContent = ''
                     q('#speak-button').disabled = false
-                    q('#audio').src = URL.createObjectURL(blob)
-                    q('#audio').hidden = false
+                    q(audio).src = URL.createObjectURL(blob)
+                    q(audio).hidden = false
+                    if (audio != "#audio" && !q('#audio').paused) {
+                        q(audio).pause();
+                    }
                 }).catch(function (err) {
                     q('#message').textContent = 'Error: ' + err.message
                     q('#speak-button').disabled = false
                 })
+        }
+        function synthesize2(text, speaker_id, style_wav, language_id) {
+            const sentences = text.split("\n");
+            const text1 = sentences.slice(0, Math.min(12, sentences.length)).join("\n")
+            const text2 = sentences.slice(Math.min(12, sentences.length), Math.max(12, sentences.length)).join("\n")
+            synthesize(text1, speaker_id, style_wav, language_id, '#audio')
+            synthesize(text2, speaker_id, style_wav, language_id, '#audio2')
         }
     </script>
 
