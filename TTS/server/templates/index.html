@@ -1,219 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="🐸Coqui AI TTS demo server.">
-    <meta name="author" content="🐸Coqui AI TTS">
-
-    <title>TTS engine</title>
-
-    <!-- Bootstrap core CSS -->
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css"
-        integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous"
-        rel="stylesheet">
-
-    <!-- Custom styles for this template -->
+    <title>Dynamic TTS Player</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
-            padding-top: 54px;
-        }
-
-        @media (min-width: 992px) {
-            body {
-                padding-top: 56px;
-            }
-        }
         textarea {
-            height: 1000px;
-            width: 800px;
+            height: 500px;
+            width: 100%;
             resize: both;
             overflow: auto;
         }
     </style>
 </head>
-
 <body>
-    <a href="https://github.com/coqui-ai/TTS"><img style="position: absolute; z-index:1000; top: 0; left: 0; border: 0;"
-            src="https://s3.amazonaws.com/github/ribbons/forkme_left_darkblue_121621.png" alt="Fork me on GitHub"></a>
+<div class="container text-center mt-4">
+    <h1>TTS Demo</h1>
+    <textarea id="text" placeholder="Type text here..."></textarea><br><br>
+    <button id="speak-button">Speak</button>
+    <p id="message"></p>
+    <div id="audio-container"></div>
+</div>
 
-    <!-- Navigation -->
-    <!--
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
-      <div class="container">
-        <a class="navbar-brand" href="#">Coqui TTS</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarResponsive">
-          <ul class="navbar-nav ml-auto">
-            <li class="nav-item active">
-              <a class="nav-link" href="#">Home
-                <span class="sr-only">(current)</span>
-              </a>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </nav>
-    -->
+<script>
+    function q(selector) { return document.querySelector(selector); }
 
-    <!-- Page Content -->
-    <div class="container">
-        <div class="row">
-            <div class="col-lg-12 text-center">
-                <img class="mt-5" src="{{url_for('static', filename='coqui-log-green-TTS.png')}}" align="middle"
-                    width="512" />
+    const lengths = [4, 12, 30, 60, 180, 300, 600, 900, 1200, 1500];
+    const maxChunks = lengths.length + 1;
+    const audioEls = [];
 
-                <ul class="list-unstyled">
-                </ul>
-
-                {%if use_gst%}
-                <input value='{"0": 0.1}' id="style_wav" placeholder="style wav (dict or path to wav).." size=45
-                    type="text" name="style_wav">
-                {%endif%}
-
-                <textarea id="text" placeholder="Type here..." type="text" name="text"></textarea>
-
-                <ul class="list-unstyled">
-                </ul>
-                
-                <button id="speak-button" name="speak">Speak</button><br /><br />
-
-                {%if use_multi_speaker%}
-                Choose a speaker:
-                <select id="speaker_id" name=speaker_id method="GET" action="/">
-                    {% for speaker_id in speaker_ids %}
-                    <option value="{{speaker_id}}" SELECTED>{{speaker_id}}</option>"
-                    {% endfor %}
-                </select><br /><br />
-                {%endif%}
-
-                {%if use_multi_language%}
-                Choose a language:
-                <select id="language_id" name=language_id method="GET" action="/">
-                    {% for language_id in language_ids %}
-                    <option value="{{language_id}}" SELECTED>{{language_id}}</option>"
-                    {% endfor %}
-                </select><br /><br />
-                {%endif%}
-
-
-                {%if show_details%}
-                <button id="details-button" onclick="location.href = 'details'" name="model-details">Model
-                    Details</button><br /><br />
-                {%endif%}
-                <div class="col-lg-12 text-center">
-                    <audio id="audio" controls autoplay hidden></audio>
-                    <audio id="audio2" controls autoplay hidden></audio>
-                    <audio id="audio3" controls autoplay hidden></audio>
-                    <audio id="audio4" controls autoplay hidden></audio>
-                </div>
-                <p id="message"></p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bootstrap core JavaScript -->
-    <script>
-        function getTextValue(textId) {
-            const container = q(textId)
-            if (container) {
-                return container.value
-            }
-            return ""
+    // Create audio elements once
+    function initAudioElements() {
+        const container = q('#audio-container');
+        for (let i = 0; i < maxChunks; i++) {
+            const audioEl = document.createElement("audio");
+            audioEl.id = `audio${i + 1}`;
+            audioEl.controls = true;
+            audioEl.hidden = true;
+            container.appendChild(audioEl);
+            audioEls.push(audioEl);
         }
-        function q(selector) { return document.querySelector(selector) }
-        q('#text').focus()
-        function do_tts(e) {
-            const text = q('#text').value
-            const speaker_id = getTextValue('#speaker_id')
-            const style_wav = getTextValue('#style_wav')
-            const language_id = getTextValue('#language_id')
-            if (text) {
-                q('#message').textContent = 'Synthesizing...'
-                q('#speak-button').disabled = true
-                q('#audio1').hidden = true
-                q('#audio1').src = ""
-                q('#audio2').hidden = true
-                q('#audio2').src = ""
-                q('#audio3').hidden = true
-                q('#audio3').src = ""
-                q('#audio4').hidden = true
-                q('#audio4').src = ""
-                synthesize2(text, speaker_id, style_wav, language_id)
-            }
-            e.preventDefault()
-            return false
+
+        // Chain playback
+        for (let i = 0; i < maxChunks - 1; i++) {
+            audioEls[i].addEventListener('ended', () => {
+                if (!audioEls[i + 1].src) return;
+                audioEls[i + 1].currentTime = 0;
+                audioEls[i + 1].play();
+            });
         }
-        q('#speak-button').addEventListener('click', do_tts)
+    }
+
+    function synthesize(text, speaker_id = "", style_wav = "", language_id = "", audioEl) {
+        fetch(`/api/tts?text=${encodeURIComponent(text)}&speaker_id=${encodeURIComponent(speaker_id)}&style_wav=${encodeURIComponent(style_wav)}&language_id=${encodeURIComponent(language_id)}`, { cache: 'no-cache' })
+            .then(res => {
+                if (!res.ok) throw Error(res.statusText);
+                return res.blob();
+            })
+            .then(blob => {
+                q('#message').textContent = '';
+                q('#speak-button').disabled = false;
+                audioEl.src = URL.createObjectURL(blob);
+                audioEl.hidden = false;
+            })
+            .catch(err => {
+                q('#message').textContent = 'Error: ' + err.message;
+                q('#speak-button').disabled = false;
+            });
+    }
+
+    function synthesizeAll(text, speaker_id = "", style_wav = "", language_id = "") {
+        const sentences = text.split(/[\n.]/).map(s => s.trim()).filter(s => s.length > 0);
+        console.log("text sentence count: " + sentences.length);
+
+        for (let i = 0; i < maxChunks; i++) {
+            const start = i === 0 ? 0 : lengths[i - 1];
+            const end = i < lengths.length ? lengths[i] : sentences.length;
+            const chunk = sentences.slice(start, end).join(". ");
+
+            const audioEl = audioEls[i];
+
+            // Reset
+            audioEl.hidden = true;
+            audioEl.src = "";
+
+            if (chunk.trim()) {
+                audioEl.autoplay = (i === 0);
+                synthesize(chunk, speaker_id, style_wav, language_id, audioEl);
+            }
+        }
+    }
+
+    function do_tts(e) {
+        const text = q('#text').value;
+        if (text.trim()) {
+            q('#message').textContent = 'Synthesizing...';
+            q('#speak-button').disabled = true;
+            synthesizeAll(text);
+        }
+        e.preventDefault();
+        return false;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        initAudioElements();
+        q('#speak-button').addEventListener('click', do_tts);
         q('#text').addEventListener('keyup', function (e) {
-            if (e.keyCode == 13) { // enter
-                do_tts(e)
-            }
-        })
-        q('#audio1').addEventListener('ended', () => {
-            if (! q('#audio2').hidden) {
-                q('#audio2').currentTime = 0;
-                q('#audio2').play();  
-            }
+            if (e.keyCode === 13) do_tts(e);
         });
-        q('#audio2').addEventListener('ended', () => {
-            if (! q('#audio3').hidden) {
-                q('#audio3').currentTime = 0;
-                q('#audio3').play();
-            }
-        });
-        q('#audio3').addEventListener('ended', () => {
-            if (! q('#audio4').hidden) {
-                q('#audio4').currentTime = 0;
-                q('#audio4').play();
-            }
-        });
-        function synthesize(text, speaker_id = "", style_wav = "", language_id = "", audio = 1) {
-            fetch(`/api/tts?text=${encodeURIComponent(text)}&speaker_id=${encodeURIComponent(speaker_id)}&style_wav=${encodeURIComponent(style_wav)}&language_id=${encodeURIComponent(language_id)}`, { cache: 'no-cache' })
-                .then(function (res) {
-                    if (!res.ok) throw Error(res.statusText)
-                    return res.blob()
-                }).then(function (blob) {
-                    q('#message').textContent = ''
-                    q('#speak-button').disabled = false
-                    q(audio).src = URL.createObjectURL(blob)
-                    q(audio).hidden = false
-                    for (let i = 1; i < audio; i++){
-                        if (!q("#audio" + i).paused) {
-                            q("#audio" + audio).pause();
-                            break; 
-                        }
-                    }
-                }).catch(function (err) {
-                    q('#message').textContent = 'Error: ' + err.message
-                    q('#speak-button').disabled = false
-                })
-        }
+    });
+</script>
 
-        function synthesize2(text, speaker_id, style_wav, language_id) {
-            const sentences = text.split("\n");
-            const lengths = [6, 18, 60];
-            const text1 = sentences.slice(0, Math.min(lengths[0], sentences.length)).join("\n");
-            synthesize(text1, speaker_id, style_wav, language_id, 1);
-            if (sentences.length > lengths[0]) {
-                const text2 = sentences.slice(lengths[0], Math.min(lengths[1], sentences.length)).join("\n");
-                synthesize(text2, speaker_id, style_wav, language_id, 2);
-            }
-            if (sentences.length > lengths[1]) {
-                const text3 = sentences.slice(lengths[1], Math.min(lengths[2], sentences.length)).join("\n");
-                synthesize(text3, speaker_id, style_wav, language_id, 3);
-            }
-            if (sentences.length > lengths[2]) {
-                const text4 = sentences.slice(lengths[2], sentences.length).join("\n");
-                synthesize(text4, speaker_id, style_wav, language_id, 4);
-            }
-        }
-    </script>
 
 </body>
-
 </html>
