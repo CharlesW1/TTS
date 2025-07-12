@@ -76,7 +76,7 @@
 
         for (let i = 0; i < maxChunks; i++) {
             const start = i === 0 ? 0 : lengths[i - 1];
-            const end = lengths[i] < lengths.length ? lengths[i] : sentences.length;
+            const end = i < lengths.length ? lengths[i] : sentences.length;
             console.log("progress: ", i, start, end);
             const chunk = sentences.slice(start, end).join(". ");
 
