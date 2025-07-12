@@ -25,12 +25,13 @@
 <script>
     function q(selector) { return document.querySelector(selector); }
 
-    const lengths = [4, 12, 30, 60, 180, 300, 600, 900, 1200, 1500];
+    const lengths = [2, 4, 10, 25, 50, 100, 200, 400];
     const maxChunks = lengths.length + 1;
+    console.log(lengths);
     const audioEls = [];
 
     // Create audio elements once
-    function initAudioElements() {
+    function initAudioElements() { 
         const container = q('#audio-container');
         for (let i = 0; i < maxChunks; i++) {
             const audioEl = document.createElement("audio");
@@ -75,7 +76,8 @@
 
         for (let i = 0; i < maxChunks; i++) {
             const start = i === 0 ? 0 : lengths[i - 1];
-            const end = i < lengths.length ? lengths[i] : sentences.length;
+            const end = lengths[i] < lengths.length ? lengths[i] : sentences.length;
+            console.log("progress: ", i, start, end);
             const chunk = sentences.slice(start, end).join(". ");
 
             const audioEl = audioEls[i];
